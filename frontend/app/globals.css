@@ -2063,3 +2063,42 @@ textarea.input {
 .password-field .input {
   padding-right: 34px;
 }
+
+/* ---------- scrolling fixes ---------- */
+.workspace {
+  min-width: 0;
+}
+.panel-body {
+  max-height: 100%;
+}
+
+/* ---------- CC button ---------- */
+.cc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.cc-btn:hover:not(:disabled) {
+  background: var(--primary-weak);
+  border-color: rgba(59, 91, 219, 0.3);
+  color: var(--primary);
+}
+.cc-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.cc-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

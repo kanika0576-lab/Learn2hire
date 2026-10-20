@@ -23,8 +23,19 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
   const [rate, setRate] = useState(1);
   const [mediaError, setMediaError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [ccEnabled, setCcEnabled] = useState(false);
 
   const video = course.materials.find((m) => m.kind === "video");
+  const transcript = course.materials.find((m) => m.kind === "transcript");
+
+  const token = getToken();
+  // cache-bust so a previously cached 401 (old auth-less URL) can never stick around
+  const src = video
+    ? `/api/courses/${course.id}/materials/${video.id}/file?token=${encodeURIComponent(token ?? "")}&v=${reloadKey}`
+    : null;
+  const captionSrc = transcript
+    ? `/api/courses/${course.id}/materials/${transcript.id}/file?token=${encodeURIComponent(token ?? "")}&v=${reloadKey}`
+    : null;
 
   useImperativeHandle(ref, () => ({
     seek(t: number) {
@@ -70,11 +81,9 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
     el.play().catch(() => undefined);
   }
 
-  const token = getToken();
-  // cache-bust so a previously cached 401 (old auth-less URL) can never stick around
-  const src = video
-    ? `/api/courses/${course.id}/materials/${video.id}/file?token=${encodeURIComponent(token ?? "")}&v=${reloadKey}`
-    : null;
+  function toggleCC() {
+    setCcEnabled((prev) => !prev);
+  }
 
   function reload() {
     setMediaError("");
@@ -109,7 +118,16 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
                   : "This video file could not be decoded. Re-uploading it will convert it to MP4 automatically."
               )
             }
-          />
+          >
+            {captionSrc && (
+              <track
+                kind="captions"
+                src={captionSrc}
+                label="Captions"
+                default={ccEnabled}
+              />
+            )}
+          </video>
         ) : src ? (
           <div className="player-placeholder">
             <div className="big">⚠️</div>
@@ -176,9 +194,18 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
               aria-label="Forward 10 seconds"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M13 19 22 12 13 5v7h-1a8 8 0 1 0 5 13h-2a6 6 0 1 1-3-11h1z" />
+                <path d="M13 19 22 12 13 5v7h-1a8 8 0 1 0 5 13h-2a6 6 0 1 0 3-11h1z" />
               </svg>
               <span>10</span>
+            </button>
+            <button
+              className="cc-btn"
+              onClick={toggleCC}
+              title="Closed Captions"
+              aria-label={ccEnabled ? "Hide captions" : "Show captions"}
+              aria-pressed={ccEnabled}
+            >
+              CC
             </button>
             <span className="time">
               {fmtTime(currentTime)} / {fmtTime(duration)}
@@ -202,10 +229,10 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
                 ))}
               </select>
             )}
+            <span className="now-asking" title="Questions are gated to content at or before this time">
+              🕒 Asking at {fmtTime(currentTime)}
+            </span>
           </div>
-          <span className="now-asking" title="Questions are gated to content at or before this time">
-            🕒 Asking at {fmtTime(currentTime)}
-          </span>
         </div>
       </div>
     </section>
