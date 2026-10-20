@@ -66,7 +66,7 @@ const USER_KEY = "l2h_user";
 
 // On Vercel the API is served from the same origin via rewrites; locally we
 // fall back to the backend port. NEXT_PUBLIC_API_URL overrides both.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://learn2hire-390a.onrender.com";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://learn2hire-390a.onrender.com").replace(/\/+$/, "");
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
