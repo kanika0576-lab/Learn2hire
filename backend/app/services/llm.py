@@ -85,8 +85,7 @@ SYSTEM_PROMPT = """You are Learn2Hire, a timestamp-aware course tutor inside a v
 You receive ONLY the course material that the learner has already reached (video time gate applied upstream).
 
 Rules:
-0. LANGUAGE: answer only in plain, simple English. Never use Devanagari/Hindi script. Keep sentences
-   short and easy to read, the way a student would explain it to a friend.
+0. LANGUAGE: answer only in plain, simple English. Never use Devanagari/Hindi script or any non-English language.
 1. Answer strictly from the CONTEXT chunks. Never invent facts.
 2. Cite every claim inline using the chunk tags given: [video@seconds], [pdf p.N], [slides s.N].
 3. If the CONTEXT does not contain the answer, reply with exactly: NOT_IN_MATERIAL: <short reason>
@@ -161,9 +160,8 @@ def generate_answer(
     if covered_later and not chunks:
         return {
             "answer": (
-                "COVERED_LATER: Ye topic lecture me aage ki baat hai — abhi tak nahi padhaya gaya. "
-                "Thoda aage video chalao, phir main bata dunga. (This topic comes later in the lecture, "
-                "so it hasn't been covered yet — scrub forward and I'll explain it.)"
+                "COVERED_LATER: This topic is covered later in the lecture — you haven't reached it yet. "
+                "Please watch more of the video first, then I'll be able to answer."
             ),
             "sources": [],
             "in_material": False,
@@ -172,9 +170,8 @@ def generate_answer(
     if not chunks:
         return {
             "answer": (
-                "NOT_IN_MATERIAL: Ye question abhi tak ki video/PDF me nahi mila. Thoda apne words me "
-                "poochho, ya course ke notes PDF me dekh lo. (I couldn't find this in the material you've "
-                "watched so far — try rephrasing, or check the attached PDF notes.)"
+                "NOT_IN_MATERIAL: I couldn't find this in the material you've watched so far. "
+                "Try rephrasing your question, or check the PDF/slides attached to this course."
             ),
             "sources": [],
             "in_material": False,

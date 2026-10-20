@@ -96,6 +96,9 @@ def generate(course_id: str, video_time: float | None, n: int, history: list[dic
     if not seed_chunks:
         seed_chunks = search(course_id, "introduction basics", None, top_k=8, time_gate=False)
     if not seed_chunks:
+        # Try with any chunks at all
+        seed_chunks = search(course_id, "", None, top_k=8, time_gate=False)
+    if not seed_chunks:
         return []
     if settings.demo_mode:
         questions = _template_questions(seed_chunks, n)

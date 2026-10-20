@@ -15,10 +15,8 @@ from app.services.index import retrieve_for_question, search
 NOTES_PROMPT = """You are writing revision notes for a student who just finished a lecture.
 
 LANGUAGE RULES (critical):
-- Write ONLY in plain, simple English.
-- NEVER use Devanagari or Hindi script (no "नहीं", "है", etc.).
-- Use short everyday words, the way a student would write them: "we store", "it takes time",
-  "you can do this", not heavy academic phrasing. Keep it easy to read for a beginner.
+- Write ONLY in plain, simple English. NEVER use any non-English script (no Hindi, no Devanagari, no other languages).
+- Use short everyday words, the way a student would write them: "we store", "it takes time", "you can do this", not heavy academic phrasing. Keep it easy to read for a beginner.
 
 Use ONLY the context chunks. Produce:
 1. A 2-3 sentence summary of the lecture, in easy English.
