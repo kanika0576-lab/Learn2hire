@@ -9,11 +9,16 @@ import { api, setSession } from "@/lib/api";
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");\n  const [showPassword, setShowPassword] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  function togglePassword() {\n    setShowPassword(!showPassword);\n  }\n\n  async function submit(e: FormEvent) {
+  function togglePassword() {
+    setShowPassword(!showPassword);
+  }
+
+  async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setBusy(true);
