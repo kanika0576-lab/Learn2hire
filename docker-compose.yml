@@ -1,0 +1,72 @@
+# Learn2Hire — full stack for teammates / judges with Docker installed.
+#
+#   docker compose up --build
+#   docker compose exec backend python seed.py      # loads the demo course
+#   demo login:  demo@learn2hire.dev / demo1234
+#
+# Runs in DEMO_MODE (local fallbacks) so it works with no AWS account.
+# To use the real AWS path, set DEMO_MODE=false and fill AWS_* vars in backend/.env.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: learn2hire
+      POSTGRES_PASSWORD: learn2hire
+      POSTGRES_DB: learn2hire
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learn2hire"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - osdata:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    environment:
+      DEMO_MODE: "true"
+      JWT_SECRET: docker-demo-secret-change-me
+      DATABASE_URL: postgresql+psycopg2://learn2hire:learn2hire@postgres:5432/learn2hire
+      UPLOAD_DIR: /data/uploads
+      OPENSEARCH_URL: http://opensearch:9200
+      L2H_SAMPLE_DIR: /sample
+    volumes:
+      - uploads:/data/uploads
+      - ./sample:/sample:ro
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    environment:
+      API_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  osdata:
+  uploads:

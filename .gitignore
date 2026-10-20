@@ -1,0 +1,19 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Next.js
+node_modules/
+.next/
+
+# Python
+__pycache__/
+.venv/
+venv/
+*.py[cod]
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3

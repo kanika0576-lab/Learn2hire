@@ -1,0 +1,97 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 565 >>
+stream
+BT /F1 12 Tf 50 780 Td 16 TL
+(Course Notes - Arrays and Linked Lists) Tj
+() Tj T*
+(An array stores elements in contiguous memory.) Tj T*
+(Index access is O\(1\): the address of element i is base + i * size.) Tj T*
+() Tj T*
+(A linked list stores nodes with a value and a pointer to the next node.) Tj T*
+(Insertion at the head is O\(1\), but there is no random access - reaching) Tj T*
+(element i costs O\(i\).) Tj T*
+() Tj T*
+(Choose arrays when you read by index often; choose linked lists when you) Tj T*
+(insert or delete at known positions frequently.) Tj T*
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 8 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 598 >>
+stream
+BT /F1 12 Tf 50 780 Td 16 TL
+(Course Notes - Stacks, Queues and Hash Maps) Tj
+() Tj T*
+(A stack is LIFO: push adds to the top, pop removes from the top.) Tj T*
+(Typical uses: undo history, expression evaluation, DFS.) Tj T*
+() Tj T*
+(A queue is FIFO: enqueue adds at the rear, dequeue removes from the front.) Tj T*
+(Typical uses: task scheduling, BFS, buffering.) Tj T*
+() Tj T*
+(A hash map hashes each key into a bucket. Average lookup, insert and) Tj T*
+(delete are O\(1\); worst case is O\(n\) on collisions. A good hash function) Tj T*
+(and a sensible load factor keep buckets short.) Tj T*
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 10 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+10 0 obj
+<< /Length 762 >>
+stream
+BT /F1 12 Tf 50 780 Td 16 TL
+(Course Notes - Trees, Heaps, Graphs and DP) Tj
+() Tj T*
+(A binary search tree keeps keys sorted; a balanced BST \(height ~ log n\)) Tj T*
+(supports search, insert and delete in O\(log n\).) Tj T*
+() Tj T*
+(A heap is a complete tree satisfying the heap property. It powers priority) Tj T*
+(queues: insert and extract-min are O\(log n\), peek is O\(1\).) Tj T*
+() Tj T*
+(Graphs are vertices and edges. BFS explores level by level \(shortest path) Tj T*
+(in unweighted graphs\); DFS explores deep first \(cycle detection, topo sort\).) Tj T*
+() Tj T*
+(Dynamic programming caches subproblem results when a problem has optimal) Tj T*
+(substructure and overlapping subproblems - turning exponential into) Tj T*
+(polynomial time.) Tj T*
+ET
+endstream
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000197 00000 n 
+0000000218 00000 n 
+0000000344 00000 n 
+0000000960 00000 n 
+0000001086 00000 n 
+0000001735 00000 n 
+0000001862 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R >>
+startxref
+2676
+%%EOF

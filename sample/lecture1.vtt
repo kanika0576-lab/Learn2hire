@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00.000 --> 00:00:12.000
+Welcome to Intro to Data Structures. Today we start with arrays.
+
+00:00:12.000 --> 00:00:30.000
+An array stores elements in contiguous memory, giving O(1) index access.
+
+00:00:30.000 --> 00:01:00.000
+Linked lists trade that for O(1) insertion at the head, but lose random access.
+
+00:01:00.000 --> 00:01:30.000
+Stacks are LIFO structures. Push adds to the top, pop removes from the top.
+
+00:01:30.000 --> 00:02:00.000
+Queues are FIFO. Enqueue adds at the rear, dequeue removes from the front.
+
+00:02:00.000 --> 00:02:40.000
+Hash maps give average O(1) lookup by hashing keys into buckets.
+
+00:02:40.000 --> 00:03:20.000
+Trees keep data sorted. A binary search tree supports O(log n) search when balanced.
+
+00:03:20.000 --> 00:04:00.000
+Heaps implement priority queues, with O(log n) extract-min.
+
+00:04:00.000 --> 00:04:40.000
+Graphs are collections of vertices and edges, traversed with BFS or DFS.
+
+00:04:40.000 --> 00:05:20.000
+Dynamic programming caches subproblem results to avoid recomputation.
+
+00:05:20.000 --> 00:06:00.000
+In the next lesson we implement a red-black tree from scratch.
