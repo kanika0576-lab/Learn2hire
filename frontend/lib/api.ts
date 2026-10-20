@@ -64,6 +64,10 @@ export type Scorecard = {
 const TOKEN_KEY = "l2h_token";
 const USER_KEY = "l2h_user";
 
+// On Vercel the API is served from the same origin via rewrites; locally we
+// fall back to the backend port. NEXT_PUBLIC_API_URL overrides both.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://learn2hire-390a.onrender.com";
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(TOKEN_KEY);
@@ -106,7 +110,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(`/api${path}`, { ...init, headers });
+  const res = await fetch(`${API_BASE}/api${path}`, { ...init, headers });
   if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/auth")) {
     clearSession();
     window.location.href = "/login";

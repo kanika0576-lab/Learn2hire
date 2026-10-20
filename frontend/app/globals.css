@@ -2026,3 +2026,40 @@ textarea.input {
   font-weight: 700;
   letter-spacing: 0.02em;
 }
+
+
+/* Password toggle */
+
+/* Password toggle button */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1;
+}
+.password-toggle:hover {
+  color: var(--text);
+}
+.password-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.password-field .input {
+  padding-right: 34px;
+}

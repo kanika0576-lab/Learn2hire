@@ -9,11 +9,11 @@ import { api, setSession } from "@/lib/api";
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState("");\n  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function submit(e: FormEvent) {
+  function togglePassword() {\n    setShowPassword(!showPassword);\n  }\n\n  async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setBusy(true);
@@ -53,18 +53,29 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          <div className="field">
+          <div className="field password-field">
             <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              className="input"
-              type="password"
-              required
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="password-input-wrapper">
+              <input
+                id="password"
+                className="input"
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={togglePassword}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? "🙈" : "👁️"}
+              </button>
+            </div>
           </div>
           <button className="btn block" disabled={busy} type="submit">
             {busy && <span className="spinner" />}
