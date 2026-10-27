@@ -4,98 +4,17 @@
 Statuses are written back to Course/Material rows so the UI can show progress.
 """
 
-import json
 import logging
 import os
-import shutil
-import subprocess
 
 from sqlalchemy.orm import Session
 
 from app.models import Course, Material
 from app.services import chunking, storage, transcription
+from app.services.convert import ensure_playable, probe_codecs, segments_to_vtt
 from app.services.index import get_index
 
 log = logging.getLogger("learn2hire.ingest")
-
-# formats browsers cannot play in <video> — remuxed/converted to mp4 during ingestion
-# (avif is an image/animated-image container: always re-encoded, never stream-copied)
-NEEDS_REMUX = {"mkv", "avi", "flv", "wmv", "ts", "m4v", "mov", "mts", "m2ts", "avif", "gif", "webp", "3gp"}
-
-# image containers that can hold animation — never stream-copied, always re-encoded
-IMAGE_CONTAINERS = {"avif", "gif", "webp", "apng"}
-
-
-def ensure_playable(video: Material) -> None:
-    """Remux browser-hostile containers (mkv/avi/mov/…) to mp4 with ffmpeg if available.
-
-    Stream-copy first (instant, lossless); falls back to h264/aac re-encode.
-    Rewrites the material row to point at the playable file. No-op for mp4/webm.
-    """
-    ext = video.filename.lower().rsplit(".", 1)[-1] if "." in video.filename else ""
-    if ext not in NEEDS_REMUX:
-        return
-    ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg:
-        log.warning("ffmpeg not found; %s left as-is (may not play in the browser)", video.filename)
-        return
-
-    src = video.storage_key
-    if not (os.path.isabs(src) and os.path.exists(src)):
-        return  # remote (S3) files are streamed as uploaded; remux is a local convenience
-    dst = os.path.splitext(src)[0] + ".mp4"
-
-    has_audio = _has_audio(src)
-    # 1) copy video, normalise audio to AAC (plays everywhere, clear voice)
-    # 2) full re-encode fallback (avif/image, exotic codecs, ...)
-    attempts = [["-c:v", "copy"]]
-    if has_audio:
-        attempts[0] += ["-c:a", "aac", "-b:a", "128k"]
-    attempts.append(["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p"])
-
-    # Animated image containers (avif/gif/webp) must always be re-encoded: stream-copying
-    # them into mp4 silently keeps only the first frame and truncates the video to ~1s.
-    if ext in IMAGE_CONTAINERS:
-        attempts = attempts[1:]
-
-    for args in attempts:
-        try:
-            proc = subprocess.run(
-                [ffmpeg, "-y", "-i", src, *args, "-movflags", "+faststart", dst],
-                capture_output=True,
-                timeout=1800,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-            if proc.returncode == 0 and os.path.exists(dst) and os.path.getsize(dst) > 0:
-                old = src
-                video.storage_key = dst
-                video.filename = os.path.splitext(video.filename)[0] + ".mp4"
-                try:
-                    os.remove(old)
-                except OSError:
-                    pass
-                log.info("remuxed %s -> %s", old, dst)
-                return
-        except Exception:
-            log.exception("remux attempt failed for %s", video.filename)
-    log.warning("could not remux %s; keeping original", video.filename)
-
-
-def _has_audio(path: str) -> bool:
-    """True when the file carries an audio stream (so we keep the voice)."""
-    probe = shutil.which("ffprobe")
-    if not probe:
-        return True  # assume yes; the AAC copy attempt fails safely otherwise
-    try:
-        proc = subprocess.run(
-            [probe, "-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", path],
-            capture_output=True,
-            timeout=120,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        return b"audio" in proc.stdout
-    except Exception:
-        return True
 
 
 def ingest_course(db: Session, course: Course) -> dict:
@@ -207,18 +126,19 @@ def _ingest_video(
     # a lecture. Detect it up front and say so plainly instead of pretending it indexed.
     src_path = video.storage_key
     if os.path.isabs(src_path) and os.path.exists(src_path):
-        dur, has_video, has_audio, probe_ok = _probe(src_path)
-        if probe_ok:
+        info = probe_codecs(src_path)
+        if info.get("ok"):
+            dur = info["duration"]
             video.duration_seconds = dur
-            if not has_video or dur < 2.0:
+            if not info["has_video"] or dur < 2.0:
                 video.status = "error"
                 db.commit()
                 return [], (
-                    f"“{video.filename}” is only {dur:.0f}s long — it looks like a still image, "
-                    "not a lecture video. Upload the real video file "
-                    "(.mp4/.mkv/.webm downloaded from YouTube) and build again."
+                    f"“{video.filename}” is only {dur:.0f}s long — it looks like a still image "
+                    "(YouTube thumbnails are often .avif pictures), not a lecture. "
+                    "Upload the real video (.mp4 / .mkv / .webm) and build again."
                 ), True
-            if not has_audio:
+            if not info["has_audio"]:
                 warning = (
                     f"“{video.filename}” has no audio track, so it cannot be transcribed automatically — "
                     "add a .vtt/.srt caption file to get a full transcript."
@@ -257,39 +177,14 @@ def _ingest_video(
         ), False
 
     video.duration_seconds = transcription.extract_duration(segments)
+    if transcript_mat is None:
+        try:
+            _save_generated_captions(db, course, video, segments)
+        except Exception:
+            log.exception("could not persist generated captions")
     db.commit()
     chunks = chunking.chunk_video_transcript(course.id, video.id, video.filename, segments)
     return chunks, warning, False
-
-
-def _probe(path: str) -> tuple[float, bool, bool, bool]:
-    """Return (duration_seconds, has_video, has_audio, probe_ok).
-
-    probe_ok=False means we could not measure the file at all (not a decodable
-    container) — callers must not treat that as "too short".
-    """
-    probe = shutil.which("ffprobe")
-    if not probe:
-        return 0.0, True, True, False
-    try:
-        proc = subprocess.run(
-            [
-                probe, "-v", "error",
-                "-show_entries", "format=duration:stream=codec_type",
-                "-of", "json", path,
-            ],
-            capture_output=True,
-            timeout=120,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        data = json.loads(proc.stdout or "{}")
-        types = {s.get("codec_type") for s in data.get("streams", [])}
-        if not types:
-            return 0.0, True, True, False
-        dur = float(data.get("format", {}).get("duration") or 0.0)
-        return dur, "video" in types, "audio" in types, True
-    except Exception:
-        return 0.0, True, True, False
 
 
 def _auto_transcribe(video: Material) -> tuple[list[dict], str]:
@@ -324,6 +219,26 @@ def _auto_transcribe(video: Material) -> tuple[list[dict], str]:
         log.info("speech-to-text produced %d segments for %s", len(segments), video.filename)
         return segments, ""
     return [], "Speech-to-text found no speech in this video — it may be silent."
+
+
+def _save_generated_captions(db: Session, course: Course, video: Material, segments: list[dict]) -> None:
+    """Persist auto-generated captions as a .vtt so the player can show CC and notes stay timestamped."""
+    already = next((m for m in course.materials if m.kind == "transcript"), None)
+    if already:
+        return
+    vtt = segments_to_vtt(segments)
+    name = os.path.splitext(video.filename)[0] + ".generated.vtt"
+    key = storage.save_upload(course.id, name, vtt.encode("utf-8"))
+    db.add(
+        Material(
+            course_id=course.id,
+            kind="transcript",
+            filename=name,
+            storage_key=key,
+            status="transcribed",
+        )
+    )
+    db.commit()
 
 
 def _demo_mode() -> bool:

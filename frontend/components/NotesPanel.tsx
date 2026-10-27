@@ -46,12 +46,42 @@ export default function NotesPanel({ courseId }: { courseId: string }) {
     );
   }
 
+  const current: Notes = notes;
+  function downloadFile() {
+    const notes = current;
+    const lines = [
+      "# Revision notes",
+      "",
+      notes.summary,
+      "",
+      "## Key points",
+      ...notes.key_points.map((k) => `- ${k}`),
+      "",
+      "## Likely exam questions",
+      ...notes.exam_questions.map((q) => `- **${q.q}** — ${q.a}`),
+      "",
+      "## Terms to memorise",
+      ...notes.terms.map((t) => `- **${t.term}** — ${t.definition}`),
+      "",
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "learn2hire-notes.md";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="notes-sheet">
       <div className="spread" style={{ marginBottom: 6 }}>
         <h4>Revision notes</h4>
         <div className="row" style={{ gap: 8 }}>
           <span className="badge grey">{notes.generated_by === "gemini" ? "AI written" : "from your material"}</span>
+          <button className="btn xs secondary" onClick={downloadFile}>
+            Download .md
+          </button>
           <button className="btn xs secondary" onClick={() => generate(true)} disabled={busy}>
             {busy ? "Rebuilding…" : "Regenerate"}
           </button>

@@ -18,11 +18,11 @@ LANGUAGE RULES (critical):
 - Write ONLY in plain, simple English. NEVER use any non-English script (no Hindi, no Devanagari, no other languages).
 - Use short everyday words, the way a student would write them: "we store", "it takes time", "you can do this", not heavy academic phrasing. Keep it easy to read for a beginner.
 
-Use ONLY the context chunks. Produce:
-1. A 2-3 sentence summary of the lecture, in easy English.
-2. 4-7 key points, each a short bullet, each ending with its source tag like [video@2:10].
-3. 3-5 likely exam questions with one-line answers.
-4. 3 terms the student must memorise, each defined in one easy line.
+Use the lecture transcript AND any notes/PDF/slides in the context. Produce:
+1. A 4-6 sentence summary of what was taught, in easy English a beginner can follow.
+2. 6-10 key points covering every main idea, each a short bullet, each ending with its source tag like [video@2:10] or [pdf p.1].
+3. 4-6 likely exam questions with one-line answers.
+4. 5 terms the student must memorise, each defined in one easy line.
 
 Output ONLY valid JSON:
 {"summary": str, "key_points": [str], "exam_questions": [{"q": str, "a": str}], "terms": [{"term": str, "definition": str}]}"""
@@ -103,9 +103,9 @@ def _fallback_notes(chunks: list[dict], title: str) -> dict:
 
 
 def build(course_id: str, title: str, video_time: float | None = None) -> dict:
-    chunks = search(course_id, "summary key concepts definitions", video_time, top_k=8)
+    chunks = search(course_id, "summary key concepts definitions examples steps", None, top_k=16, time_gate=False)
     if not chunks:
-        chunks = search(course_id, "overview", None, top_k=8, time_gate=False)
+        chunks = search(course_id, "overview lecture notes", video_time, top_k=16, time_gate=False)
     if not chunks:
         return {
             "summary": f"No indexed material yet for {title}. Build the knowledge base first.",

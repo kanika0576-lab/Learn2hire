@@ -23,7 +23,7 @@ const VideoPlayer = forwardRef<PlayerHandle, Props>(function VideoPlayer(
   const [rate, setRate] = useState(1);
   const [mediaError, setMediaError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
-  const [ccEnabled, setCcEnabled] = useState(false);
+  const [ccEnabled, setCcEnabled] = useState(true);
 
   const video = course.materials.find((m) => m.kind === "video");
   const transcript = course.materials.find((m) => m.kind === "transcript");

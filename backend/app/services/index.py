@@ -16,7 +16,7 @@ from app.config import settings
 from app.services import embeddings
 
 TOKEN = re.compile(r"[a-z0-9]+")
-MIN_RELEVANCE = 0.5  # below this a "match" is noise, not evidence
+MIN_RELEVANCE = 0.18  # hashed local embeddings score low; this still filters noise
 
 
 def time_filter_clause(video_time: float | None) -> dict | None:
@@ -301,6 +301,16 @@ def retrieve_for_question(
 ) -> dict:
     """Return gated evidence plus the honest 'covered later' signal."""
     rewrite = _rewrite_query(question, history)
+    # Near the end of a lecture (or when the client sends no time), use the full index.
+    if video_time is not None:
+        try:
+            idx = get_index()
+            docs = idx._load(course_id) if hasattr(idx, "_load") else []
+            max_t = max((float(d.get("start_time") or 0) for d in docs), default=0.0)
+            if max_t and video_time >= max_t * 0.92:
+                video_time = None
+        except Exception:
+            pass
     gated = [r for r in search(course_id, rewrite, video_time, time_gate=True) if _relevant(r)]
 
     if gated:

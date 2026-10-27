@@ -416,6 +416,12 @@ export default function InterviewPanel({ courseId, initialMode = null }: Props) 
               <strong>How this was scored: </strong>
               {scorecard.explanation}
             </div>
+            {violations.length > 0 && (
+              <div className="notice" style={{ marginTop: 10 }}>
+                <strong>Integrity flags ({violations.length}):</strong> {violations.join(" · ")}
+                {violations.length >= 3 ? " — this session would not count as a clean interview." : ""}
+              </div>
+            )}
             {scorecard.topics_covered.length > 0 && (
               <div className="row" style={{ flexWrap: "wrap" }}>
                 <span className="meta">Topics:</span>

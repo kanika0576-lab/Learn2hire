@@ -5,19 +5,20 @@ import { api, ChatMsg, fmtTime, Source } from "@/lib/api";
 
 type Props = {
   courseId: string;
-  currentTime: number;
+  currentTime: number | null;
   onSeek: (t: number) => void;
   onBusyChange?: (busy: boolean) => void;
+  fullAccess?: boolean;
 };
 
-export default function ChatPanel({ courseId, currentTime, onSeek, onBusyChange }: Props) {
+export default function ChatPanel({ courseId, currentTime, onSeek, onBusyChange, fullAccess }: Props) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef(currentTime);
-  timeRef.current = currentTime;
+  timeRef.current = fullAccess ? null : currentTime;
 
   useEffect(() => {
     api<ChatMsg[]>(`/courses/${courseId}/chat`)
@@ -82,7 +83,9 @@ export default function ChatPanel({ courseId, currentTime, onSeek, onBusyChange 
             <div className="big">💬</div>
             <strong>Pause the video and ask anything</strong>
             <p style={{ marginTop: 6 }}>
-              Answers come only from material you&apos;ve reached at {fmtTime(currentTime)} — with clickable sources.
+              {fullAccess
+                ? "The lecture is done — ask anything from the full video, notes and sources."
+                : `Answers come only from material you've reached at ${fmtTime(currentTime ?? 0)} — with clickable sources.`}
             </p>
             <div className="row" style={{ justifyContent: "center", marginTop: 14, flexWrap: "wrap" }}>
               {["Explain the main concept so far", "Give me a quick example", "Summarize what I've watched"].map(
@@ -159,7 +162,7 @@ export default function ChatPanel({ courseId, currentTime, onSeek, onBusyChange 
         <div className="composer">
           <textarea
             className="input"
-            placeholder={`Ask about the lesson at ${fmtTime(currentTime)}…`}
+            placeholder={fullAccess ? "Ask any doubt from the whole lecture…" : `Ask about the lesson at ${fmtTime(currentTime ?? 0)}…`}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -175,7 +178,7 @@ export default function ChatPanel({ courseId, currentTime, onSeek, onBusyChange 
         </div>
         <div className="row" style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
           <span>⏎ send · ⇧⏎ newline</span>
-          <span style={{ marginLeft: "auto" }}>Gated to ⏱ {fmtTime(currentTime)}</span>
+          <span style={{ marginLeft: "auto" }}>{fullAccess ? "Full lecture" : `Gated to ⏱ ${fmtTime(currentTime ?? 0)}`}</span>
         </div>
       </div>
     </>

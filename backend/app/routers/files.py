@@ -31,7 +31,9 @@ CONTENT_TYPES = {
 }
 
 
-def _content_type(filename: str) -> str:
+def _content_type(filename: str, storage_key: str = "") -> str:
+    if storage_key.lower().endswith(".mp4") or filename.lower().endswith(".mp4"):
+        return "video/mp4"
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
     return CONTENT_TYPES.get(ext, "application/octet-stream")
 
@@ -78,7 +80,7 @@ def serve_material(
         raise HTTPException(404, "File not found on disk")
 
     file_size = os.path.getsize(path)
-    content_type = _content_type(mat.filename)
+    content_type = _content_type(mat.filename, mat.storage_key)
     range_header = request.headers.get("range")
 
     if not range_header:

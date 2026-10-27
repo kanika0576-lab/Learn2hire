@@ -303,27 +303,40 @@ def _update_memory(state: dict, answer: str, evaluation: dict) -> None:
 
 
 def _next_question(state: dict, chunks: list[dict]) -> str:
-    weak = state.get("weaknesses", [])
     asked = set(state.get("asked", []))
+    provider = llm.active_provider()
+    try:
+        if provider == "gemini":
+            q = _gemini_followup(chunks, state)
+            if q and q not in asked:
+                return q
+        elif provider == "bedrock":
+            q = _bedrock_opening(chunks)
+            if q and q not in asked:
+                return q
+    except Exception:
+        pass
+    weak = state.get("weaknesses", [])
     if weak:
         probe = f"You mentioned {weak[-1]} — can you go deeper on that with a concrete example?"
         if probe not in asked:
             return probe
     topic = state.get("topics_covered", [])
     if topic:
-        follow = f"How would you apply {topic[-1]} in a real project you have worked on?"
+        follow = f"How would you apply {topic[-1]} in a real project? Walk through the steps and a mistake you would watch for."
         if follow not in asked:
             return follow
     for q in FALLBACK_QUESTIONS:
         if q not in asked:
             return q
-    return "Is there anything about this course you would like to test yourself on before we finish?"
+    return "What is the hardest part of this topic in a real job, and how would you handle it?"
 
 
 INTERVIEWER_PROMPT = (
-    "You are a friendly but rigorous technical interviewer. "
-    "Ask ONE question at a time, based on the course material provided. "
-    "First question should establish baseline understanding. Output only the question text."
+    "You are a hiring-manager interviewer for a real job that uses this lecture's skills. "
+    "Ask ONE high-value question at a time. Prefer: core concept, complexity/trade-off, "
+    "a realistic work scenario, debugging, and how they would explain it to a teammate. "
+    "Ground the question in the course material. Easy English. Output only the question text."
 )
 
 EVALUATOR_PROMPT = (
@@ -345,10 +358,27 @@ def _gemini_opening(chunks: list[dict]) -> str:
     context = llm.build_context(chunks)
     resp = llm.call_gemini(
         _gemini(),
-        f"Course material:\n{context}\n\nAsk your opening interview question.",
-        generation_config={"temperature": 0.5, "max_output_tokens": 200},
+        f"Course material:\n{context}\n\nAsk your opening interview question — a real screening question a company would ask about this topic.",
+        generation_config={"temperature": 0.4, "max_output_tokens": 220},
     )
-    return resp.text.strip()
+    return (resp.text or "").strip().strip('"')
+
+
+def _gemini_followup(chunks: list[dict], state: dict) -> str:
+    context = llm.build_context(chunks)
+    asked = "\n".join(f"- {q}" for q in state.get("asked", []))
+    last = state.get("last_answer") or ""
+    weak = ", ".join(state.get("weaknesses") or []) or "none yet"
+    resp = llm.call_gemini(
+        _gemini(),
+        (
+            f"Course material:\n{context}\n\nAlready asked:\n{asked}\n\n"
+            f"Candidate's last answer: {last[:800]}\nWeak spots: {weak}\n\n"
+            "Ask the NEXT interview question. Do not repeat. Make it a real job question."
+        ),
+        generation_config={"temperature": 0.45, "max_output_tokens": 220},
+    )
+    return (resp.text or "").strip().strip('"')
 
 
 def _gemini_evaluate(answer: str, question: str, chunks: list[dict]) -> dict:

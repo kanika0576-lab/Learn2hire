@@ -48,7 +48,15 @@ def call_gemini(model, contents, generation_config=None, attempts: int = 3):
         except Exception as exc:  # noqa: BLE001 - inspect and decide
             last_exc = exc
             msg = str(exc).lower()
-            transient = "429" in msg or "resource_exhausted" in msg or "quota" in msg or "500" in msg or "503" in msg
+            transient = (
+                "429" in msg
+                or "resource_exhausted" in msg
+                or "quota" in msg
+                or "500" in msg
+                or "503" in msg
+                or "not found" in msg
+                or "404" in msg
+            )
             if not transient or i == attempts - 1:
                 raise
             time.sleep(1.5 * (i + 1) ** 2)  # 1.5s, 6s
@@ -69,16 +77,29 @@ def active_provider() -> str:
     return "demo-offline" if settings.demo_mode else "bedrock"
 
 
-def _gemini():
+_GEMINI_FALLBACKS = ("gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-1.5-flash")
+
+
+def _gemini(system_instruction: str | None = None):
     global _gemini_client
-    if _gemini_client is None:
+    instruction = system_instruction or SYSTEM_PROMPT
+    if _gemini_client is None or getattr(_gemini_client, "_l2h_instruction", None) != instruction:
         import google.generativeai as genai
 
         genai.configure(api_key=settings.gemini_api_key)
-        _gemini_client = genai.GenerativeModel(
-            settings.gemini_model,
-            system_instruction=SYSTEM_PROMPT,
-        )
+        model_name = settings.gemini_model or _GEMINI_FALLBACKS[0]
+        last_exc: Exception | None = None
+        for name in (model_name, *_GEMINI_FALLBACKS):
+            try:
+                client = genai.GenerativeModel(name, system_instruction=instruction)
+                client._l2h_instruction = instruction  # type: ignore[attr-defined]
+                _gemini_client = client
+                return _gemini_client
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                continue
+        if last_exc:
+            raise last_exc
     return _gemini_client
 
 SYSTEM_PROMPT = """You are Learn2Hire, a timestamp-aware course tutor inside a video player.
@@ -86,11 +107,11 @@ You receive ONLY the course material that the learner has already reached (video
 
 Rules:
 0. LANGUAGE: answer only in plain, simple English. Never use Devanagari/Hindi script or any non-English language.
-1. Answer strictly from the CONTEXT chunks. Never invent facts.
+1. Answer the student's doubt clearly. Teach the idea, then give a short example, using ONLY the CONTEXT chunks. Never invent facts.
 2. Cite every claim inline using the chunk tags given: [video@seconds], [pdf p.N], [slides s.N].
 3. If the CONTEXT does not contain the answer, reply with exactly: NOT_IN_MATERIAL: <short reason>
 4. If the question is about content that seems to come later in the course, reply with exactly: COVERED_LATER: <short hint>
-5. Be concise (under 180 words), friendly, and tutorial-like.
+5. Be friendly and tutorial-like. Prefer 80–160 words when explaining a concept. Do not refuse a question that is clearly covered in CONTEXT.
 6. Output ONLY valid JSON with keys: answer (string), in_material (bool), covered_later (bool).
 """
 

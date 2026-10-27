@@ -14,7 +14,6 @@ EMAIL = "demo@learn2hire.dev"
 PASSWORD = "demo1234"
 
 
-@app.on_event("startup")
 def _seed_on_startup():
     """Ensure demo account + course exist on Render startup (idempotent)."""
     Base.metadata.create_all(bind=engine)
@@ -97,6 +96,7 @@ app.include_router(files.router)
 app.include_router(ask.router)
 app.include_router(quiz.router)
 app.include_router(interview.router)
+app.add_event_handler("startup", _seed_on_startup)
 
 
 @app.get("/api/health")

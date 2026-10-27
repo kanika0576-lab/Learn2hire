@@ -86,16 +86,18 @@ async def upload_material(
                     if not payload:
                         continue
                     key = storage.save_upload(course.id, name, payload)
-                    db.add(
-                        Material(
-                            course_id=course.id,
-                            kind=_kind_for(name),
-                            filename=name,
-                            storage_key=key,
-                            status="uploaded",
-                        )
+                    mat = Material(
+                        course_id=course.id,
+                        kind=_kind_for(name),
+                        filename=name,
+                        storage_key=key,
+                        status="uploaded",
                     )
-                    names.append(name)
+                    db.add(mat)
+                    db.flush()
+                    if mat.kind == "video":
+                        ingestion.ensure_playable(mat)
+                    names.append(mat.filename)
         except zipfile.BadZipFile:
             raise HTTPException(400, "This file is not a valid ZIP archive.")
         if not names:
@@ -117,6 +119,9 @@ async def upload_material(
         status="uploaded",
     )
     db.add(mat)
+    db.flush()
+    if kind == "video":
+        ingestion.ensure_playable(mat)
     if course.status in ("ready", "error"):
         course.status = "created"
     db.commit()

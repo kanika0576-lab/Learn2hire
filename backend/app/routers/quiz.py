@@ -23,7 +23,7 @@ def generate(body: QuizGenerateIn, user=Depends(get_current_user), db: Session =
     course = _owned(body.course_id, user, db)
     if course.status != "ready":
         raise HTTPException(409, f"Course is '{course.status}'")
-    questions = generate(course.id, body.video_time, body.n_questions)
+    questions = build_questions(course.id, body.video_time, body.n_questions)
     if not questions:
         raise HTTPException(422, "Not enough indexed material to build a quiz yet")
     _store_attempt(db, course.id, user.id, questions)
@@ -76,37 +76,37 @@ def _owned(course_id: str, user: User, db: Session) -> Course:
 
 # ============================ generation + grading ============================
 
-import random
-import re
-import uuid
-
+_bedrock_client = None
 
 
 def _bedrock():
-    global client
-    if client is None:
+    global _bedrock_client
+    if _bedrock_client is None:
         import boto3
 
-        client = boto3.client("bedrock-runtime", region_name=settings.aws_region)
-    return client
+        _bedrock_client = boto3.client("bedrock-runtime", region_name=settings.aws_region)
+    return _bedrock_client
 
 
-def generate(course_id: str, video_time: float | None, n: int, history: list[dict] | None = None) -> list[dict]:
-    seed_chunks = search(course_id, "key concepts summary overview example", video_time, top_k=8)
+def build_questions(course_id: str, video_time: float | None, n: int, history: list[dict] | None = None) -> list[dict]:
+    seed_chunks = search(course_id, "key concepts definitions examples steps why how", video_time, top_k=12)
     if not seed_chunks:
-        seed_chunks = search(course_id, "introduction basics", None, top_k=8, time_gate=False)
+        seed_chunks = search(course_id, "introduction basics summary", None, top_k=12, time_gate=False)
     if not seed_chunks:
-        # Try with any chunks at all
-        seed_chunks = search(course_id, "", None, top_k=8, time_gate=False)
+        seed_chunks = search(course_id, "overview", None, top_k=12, time_gate=False)
     if not seed_chunks:
         return []
-    if settings.demo_mode:
-        questions = _template_questions(seed_chunks, n)
-    else:
-        try:
+    provider = llm.active_provider()
+    questions: list[dict] = []
+    try:
+        if provider == "gemini":
+            questions = _gemini_questions(seed_chunks, n)
+        elif provider == "bedrock":
             questions = _bedrock_questions(seed_chunks, n)
-        except Exception:
-            questions = _template_questions(seed_chunks, n)
+    except Exception:
+        questions = []
+    if len(questions) < max(2, n // 2):
+        questions = _template_questions(seed_chunks, n)
     return questions[:n]
 
 
@@ -198,6 +198,62 @@ def _distractors(target: str, chunks: list[dict], rng: random.Random) -> list[st
     return picks
 
 
+QUIZ_PROMPT = """You write quiz questions for a student who just watched this lecture.
+
+Write {n} multiple-choice questions (exactly 4 options each) from CONTEXT only.
+Rules:
+- Test understanding, not trivia: "why", "what happens if", "which is true", trade-offs, definitions.
+- Easy English. Never use Hindi/Devanagari.
+- One clearly correct option. Wrong options must be plausible but wrong.
+- Include a 1-sentence explanation that teaches the idea.
+- chunk_tag must be one of: {tags}
+
+Output JSON: {{"questions": [{{"question": str, "options": [str,str,str,str], "correct_index": 0-3, "explanation": str, "chunk_tag": str}}]}}"""
+
+
+def _gemini_questions(chunks: list[dict], n: int) -> list[dict]:
+    context = llm.build_context(chunks[:10])
+    tags = ", ".join(llm.chunk_tag(c) for c in chunks[:10])
+    model = llm._gemini(QUIZ_PROMPT.format(n=n, tags=tags))
+    resp = llm.call_gemini(
+        model,
+        f"CONTEXT:\n{context}\n\nWrite {n} quiz questions. JSON only.",
+        generation_config={"response_mime_type": "application/json", "temperature": 0.4, "max_output_tokens": 2200},
+    )
+    return _normalize_questions(llm._parse_json(resp.text), chunks)
+
+
+def _normalize_questions(raw, chunks: list[dict]) -> list[dict]:
+    items = raw if isinstance(raw, list) else (raw or {}).get("questions", [])
+    out = []
+    tag_map = {llm.chunk_tag(c): c for c in chunks}
+    for it in items:
+        if not isinstance(it, dict) or not it.get("question") or not it.get("options"):
+            continue
+        opts = [str(o) for o in it["options"][:4]]
+        if len(opts) < 2:
+            continue
+        while len(opts) < 4:
+            opts.append("None of these")
+        try:
+            idx = int(it.get("correct_index", 0))
+        except (TypeError, ValueError):
+            idx = 0
+        idx = max(0, min(idx, len(opts) - 1))
+        c = tag_map.get(it.get("chunk_tag", ""), chunks[0])
+        out.append(
+            {
+                "id": uuid.uuid4().hex[:10],
+                "question": str(it["question"]).strip(),
+                "options": opts,
+                "correct_index": idx,
+                "explanation": str(it.get("explanation") or ""),
+                "source": llm.to_source(c),
+            }
+        )
+    return out
+
+
 def _bedrock_questions(chunks: list[dict], n: int) -> list[dict]:
     context = llm.build_context(chunks[:6])
     prompt = (
@@ -212,20 +268,4 @@ def _bedrock_questions(chunks: list[dict], n: int) -> list[dict]:
         inferenceConfig={"maxTokens": 1800, "temperature": 0.3},
     )
     text = resp["output"]["message"]["content"][0]["text"]
-    raw = llm._parse_json(text)
-    items = raw if isinstance(raw, list) else raw.get("questions", [])
-    out = []
-    tag_map = {llm.chunk_tag(c): c for c in chunks}
-    for it in items:
-        c = tag_map.get(it.get("chunk_tag", ""), chunks[0])
-        out.append(
-            {
-                "id": uuid.uuid4().hex[:10],
-                "question": it["question"],
-                "options": it["options"][:4],
-                "correct_index": int(it["correct_index"]),
-                "explanation": it.get("explanation", ""),
-                "source": llm.to_source(c),
-            }
-        )
-    return out
+    return _normalize_questions(llm._parse_json(text), chunks)

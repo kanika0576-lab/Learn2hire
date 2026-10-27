@@ -258,10 +258,26 @@ export default function CoursePage() {
                 ) : (
                   <>
                     {tab === "ask" && (
-                      <ChatPanel courseId={courseId} currentTime={currentTime} onSeek={seek} onBusyChange={setAskBusy} />
+                      <ChatPanel
+                        courseId={courseId}
+                        currentTime={lectureEnded ? null : currentTime}
+                        onSeek={seek}
+                        onBusyChange={setAskBusy}
+                        fullAccess={lectureEnded}
+                      />
                     )}
-                    {tab === "quiz" && <QuizPanel courseId={courseId} currentTime={currentTime} onSeek={seek} />}
-                    {tab === "notes" && <NotesPanel courseId={courseId} />}
+                    {tab === "quiz" && (
+                      <QuizPanel
+                        courseId={courseId}
+                        currentTime={lectureEnded ? Math.max(currentTime, playerRef.current?.duration() ?? currentTime) : currentTime}
+                        onSeek={seek}
+                      />
+                    )}
+                    {tab === "notes" && (
+                      <div className="panel-body notes-scroll">
+                        <NotesPanel courseId={courseId} />
+                      </div>
+                    )}
                     {tab === "interview" && (
                       <InterviewPanel
                         key={interviewLaunch?.n ?? 0}

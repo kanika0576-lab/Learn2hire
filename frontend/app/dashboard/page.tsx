@@ -44,6 +44,7 @@ export default function Dashboard() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [uploadFor, setUploadFor] = useState<string | null>(null);
+  const [dropIntoId, setDropIntoId] = useState<string>("");
 const [drag, setDrag] = useState(false);
 const [dragOver, setDragOver] = useState(false);
 const [busyCourse, setBusyCourse] = useState<string | null>(null);
@@ -73,6 +74,10 @@ const [busyCourse, setBusyCourse] = useState<string | null>(null);
   }, [guideText]);
   const fileRef = useRef<HTMLInputElement>(null);
   const quRef = useRef<HTMLInputElement>(null);
+  const coursesRef = useRef<Course[]>([]);
+  const dropIntoRef = useRef("");
+  coursesRef.current = courses;
+  dropIntoRef.current = dropIntoId;
   // Drag depth counter: dragLeave fires when moving over children, so a boolean
 // flickers and the drop silently never registers. A counter tracks "are we still
 // inside this drop target?" and only clears when it truly exits.
@@ -119,9 +124,10 @@ const dragDepth = useRef<Record<string, number>>({});
     setCreating(true);
     setError("");
     try {
-      await api<Course>("/courses", { method: "POST", body: JSON.stringify({ title, description }) });
+      const course = await api<Course>("/courses", { method: "POST", body: JSON.stringify({ title, description }) });
       setTitle("");
       setDescription("");
+      setDropIntoId(course.id);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create course");
@@ -144,6 +150,17 @@ const dragDepth = useRef<Record<string, number>>({});
     }
   };
 
+  function resolveDropCourse(): string | "new" {
+    const list = coursesRef.current;
+    const chosen = dropIntoRef.current;
+    if (chosen === "new") return "new";
+    if (chosen && list.some((c) => c.id === chosen)) return chosen;
+    const empty = list.filter((c) => c.status === "created" || c.materials.length === 0);
+    if (empty.length) return empty[0].id;
+    if (list.length === 1) return list[0].id;
+    return "new";
+  }
+
   // Drop files anywhere on this dashboard — one helper covers every target.
   const receive = (id: string, files: FileList | File[], courseId?: string) => {
     dragDepth.current[id] = 0;
@@ -152,7 +169,7 @@ const dragDepth = useRef<Record<string, number>>({});
     if (courseId && files.length) {
       uploadFiles(courseId, files);
     } else if (files.length) {
-      quickUpload(files);
+      attachOrCreate(files);
     }
   };
 
@@ -183,7 +200,15 @@ const dragDepth = useRef<Record<string, number>>({});
     const onDrop = (e: DragEvent) => {
       e.preventDefault();
       setDragOver(false);
-      if (e.dataTransfer?.files?.length) quickUpload(e.dataTransfer.files);
+      const files = e.dataTransfer?.files;
+      if (!files?.length) return;
+      const card = (e.target as HTMLElement | null)?.closest?.("[data-course-id]");
+      const cardId = card?.getAttribute("data-course-id");
+      if (cardId) {
+        uploadFiles(cardId, files);
+        return;
+      }
+      attachOrCreate(files);
     };
     const onDragLeave = (e: DragEvent) => {
       if (!e.relatedTarget) setDragOver(false);
@@ -199,6 +224,16 @@ const dragDepth = useRef<Record<string, number>>({});
   }, []);
 
   // ---------------- upload actions ----------------
+
+  /** Put files on the course you named, or only create a new one when none exists. */
+  async function attachOrCreate(files: FileList | File[]) {
+    const target = resolveDropCourse();
+    if (target !== "new") {
+      await uploadFiles(target, files);
+      return;
+    }
+    await quickUpload(files);
+  }
 
   /** One-shot flow: create a course named after the file, upload everything, build it. */
   async function quickUpload(files: FileList | File[]) {
@@ -341,6 +376,26 @@ const dragDepth = useRef<Record<string, number>>({});
                 Create course
               </button>
             </div>
+            {courses.length > 0 && (
+              <p className="meta" style={{ marginTop: 10 }}>
+                Drops go into{" "}
+                <select
+                  className="input sm"
+                  style={{ width: "auto", display: "inline-block", padding: "4px 8px" }}
+                  value={dropIntoId}
+                  onChange={(e) => setDropIntoId(e.target.value)}
+                  aria-label="Course that receives dropped files"
+                >
+                  <option value="">the last course you created (or a new one)</option>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+                  <option value="new">a brand-new course named after the file</option>
+                </select>
+              </p>
+            )}
           </form>
         </div>
 
@@ -350,14 +405,15 @@ const dragDepth = useRef<Record<string, number>>({});
           onDragLeave={() => leaveDrag("quick")}
           onDrop={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             receive("quick", e.dataTransfer.files);
           }}
         >
           <div className="qu-copy">
             <strong>🎬 Add your own lecture</strong>
             <p>
-              Drag a recording anywhere onto this box and we&apos;ll make a course for it, convert it if the
-              browser can&apos;t play it, and transcribe the audio if you have no captions.
+              Drag a recording here. If you already created a course, files go into that course — we convert
+              odd YouTube downloads (mkv/webm/avif) to MP4 and generate captions if you have none.
             </p>
             <div className="fmt-chips">
               <span>MP4</span>
@@ -378,7 +434,7 @@ const dragDepth = useRef<Record<string, number>>({});
             multiple
             hidden
             accept=".mp4,.mov,.mkv,.webm,.m4v,.avi,.avif,.flv,.ts,.mts,.m2ts,.3gp,.gif,.webp,.zip,.pdf,.pptx,.ppt,.vtt,.srt,.txt"
-            onChange={(e) => e.target.files && quickUpload(e.target.files)}
+            onChange={(e) => e.target.files && attachOrCreate(e.target.files)}
           />
         </div>
 
@@ -395,7 +451,7 @@ const dragDepth = useRef<Record<string, number>>({});
         ) : (
           <div className="course-grid">
             {courses.map((c) => (
-              <article key={c.id} className="card course-card">
+              <article key={c.id} className="card course-card" data-course-id={c.id}>
                 <div className="spread">
                   <h3>{c.title}</h3>
                   <StatusBadge status={c.status} />
@@ -500,6 +556,7 @@ const dragDepth = useRef<Record<string, number>>({});
                     onDragLeave={() => leaveDrag(c.id)}
                     onDrop={(e) => {
                       e.preventDefault();
+                      e.stopPropagation();
                       receive(c.id, e.dataTransfer.files, c.id);
                     }}
                   >
