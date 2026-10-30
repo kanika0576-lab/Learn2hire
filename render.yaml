@@ -3,46 +3,38 @@
 # Apply in Render: Dashboard → "Blueprint" → connect this repo, or
 # `render blueprint apply` via the Render CLI.
 #
-# What this provisions:
-#  - backend: FastAPI service built from ./backend/Dockerfile (includes ffmpeg
-#    so mkv/webm/avif YouTube downloads are auto-converted to playable MP4).
-#  - backend-disk: persistent Render Disk mounted at /data so the SQLite
-#    database (registrations, chats, quiz results, courses) survives redeploys
-#    and restarts. Without a disk, DEMO_MODE SQLite data is wiped on every
-#    redeploy — which is why "registration stopped working" after a restart.
-#  - A render.yaml like this keeps the live site consistent with GitHub.
-
-render_version: 1.0
+# Updates the existing web service named "Learn2hire" (no duplicate created).
+# Backend runs from ./backend/Dockerfile (includes ffmpeg for mkv/webm/avif
+# → MP4 conversion). A persistent 1 GB disk is mounted at /data so the
+# SQLite database (registrations, chats, quiz results, courses) survives
+# redeploys and restarts.
+#
+# Notes:
+#  - JWT_SECRET and GEMINI_API_KEY are intentionally omitted so the existing
+#    values on the "Learn2hire" service are preserved (not regenerated).
+#  - DATABASE_URL uses the absolute /data path so SQLite lives on the disk.
+#  - Auto Deploy is enabled from main.
 
 services:
   - type: web
-    name: learn2hire-backend
+    name: Learn2hire
     runtime: docker
     dockerContext: ./backend
-    dockerfilePath: Dockerfile
+    dockerfilePath: ./backend/Dockerfile
     envVars:
       - key: DEMO_MODE
         value: "true"
-      - key: JWT_SECRET
-        generateValue: true
       - key: DATABASE_URL
-        value: sqlite:///./data/learn2hire.db
+        value: sqlite:////data/learn2hire.db
       - key: UPLOAD_DIR
-        value: ./data/uploads
+        value: /data/uploads
       - key: LLM_PROVIDER
         value: auto
       - key: GEMINI_MODEL
         value: gemini-2.0-flash
-    # GEMINI_API_KEY must be added manually in the Render dashboard (Environment
-    # tab) from your Google AI Studio key — it powers AI answers, notes, quiz
-    # questions, interview questions, and auto-generated subtitles.
     disk:
       name: learn2hire-data
       mountPath: /data
       sizeGB: 1
     healthCheckPath: /api/health
     autoDeploy: true
-
-disks:
-  - name: learn2hire-data
-    sizeGB: 1
