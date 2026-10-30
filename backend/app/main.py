@@ -55,7 +55,11 @@ def _seed_on_startup():
             if already:
                 continue
             sample_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sample", filename
+                os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                ),
+                "sample",
+                filename,
             )
             if not os.path.exists(sample_path):
                 continue
