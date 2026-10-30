@@ -1,10 +1,11 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import Base, engine
-from app.services.ingestion import ingest_course
 from app.database import Base, SessionLocal, engine
+from app.services.ingestion import ingest_course
 from app.models import Course, Material, User
 from app.security import hash_password
 from app.services import storage
@@ -72,14 +73,20 @@ def _seed_on_startup():
         db.close()
 
 
-from app.routers import ask, auth, courses, files, interview, quiz
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: seed database once on startup (idempotent)."""
+    _seed_on_startup()
+    yield
 
-Base.metadata.create_all(bind=engine)
+
+from app.routers import ask, auth, courses, files, interview, quiz
 
 app = FastAPI(
     title="Learn2Hire API",
     version="1.0.0",
     description="Timestamp-aware AI tutor + AI mock interviewer (AHGV BuildVerse 2026, Team codeflux)",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -96,7 +103,6 @@ app.include_router(files.router)
 app.include_router(ask.router)
 app.include_router(quiz.router)
 app.include_router(interview.router)
-app.add_event_handler("startup", _seed_on_startup)
 
 
 @app.get("/api/health")
