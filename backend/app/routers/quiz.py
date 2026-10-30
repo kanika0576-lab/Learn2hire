@@ -202,8 +202,8 @@ QUIZ_PROMPT = """You write quiz questions for a student who just watched this le
 
 Write {n} multiple-choice questions (exactly 4 options each) from CONTEXT only.
 Rules:
-- Test understanding, not trivia: "why", "what happens if", "which is true", trade-offs, definitions.
-- Easy English. Never use Hindi/Devanagari.
+- Test understanding, not trivia: "why", "what happens if", "which is true", trade-offs, definitions, how it works.
+- Easy English only. Never use Hindi/Hinglish/Devanagari or any non-English words.
 - One clearly correct option. Wrong options must be plausible but wrong.
 - Include a 1-sentence explanation that teaches the idea.
 - chunk_tag must be one of: {tags}

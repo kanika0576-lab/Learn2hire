@@ -88,6 +88,9 @@ const dragDepth = useRef<Record<string, number>>({});
     try {
       const list = await api<Course[]>("/courses");
       setCourses(list);
+      // Default the drop target to the learner's most recent (named) course so
+      // dragged-in files land in the course they created, not a brand-new one.
+      if (list.length && !dropIntoId) setDropIntoId(list[0].id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load courses");
     } finally {
@@ -154,10 +157,11 @@ const dragDepth = useRef<Record<string, number>>({});
     const list = coursesRef.current;
     const chosen = dropIntoRef.current;
     if (chosen === "new") return "new";
+    // Drops always land in a real course the learner created: the one they picked
+    // in the dropdown, or (fallback) the most recent course. Never silently spin up
+    // a brand-new course just because a file was dropped anywhere on the page.
     if (chosen && list.some((c) => c.id === chosen)) return chosen;
-    const empty = list.filter((c) => c.status === "created" || c.materials.length === 0);
-    if (empty.length) return empty[0].id;
-    if (list.length === 1) return list[0].id;
+    if (list.length) return list[0].id;
     return "new";
   }
 
