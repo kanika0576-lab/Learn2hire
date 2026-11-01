@@ -101,6 +101,10 @@ def convert_to_mp4(src: str, ext: str, has_audio: bool) -> str | None:
         log.warning("ffmpeg not found; cannot convert %s", src)
         return None
     dst = os.path.splitext(src)[0] + ".mp4"
+    # If source is already MP4, use a different output filename to avoid
+    # ffmpeg reading from and writing to the same file.
+    if src.lower().endswith(".mp4"):
+        dst = os.path.splitext(src)[0] + ".faststart.mp4"
     # Image/animated containers and exotic codecs cannot be stream-copied.
     attempts: list[list[str]] = []
     if ext not in IMAGE_CONTAINERS:
