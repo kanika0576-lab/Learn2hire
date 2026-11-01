@@ -151,8 +151,10 @@ def ensure_playable(video) -> None:
             except OSError:
                 pass
         video.filename = os.path.splitext(video.filename)[0] + ".mp4"
-    if not needs_mp4(video.filename if not real_ext else f"file.{real_ext}", info or None):
-        return
+    # Always run ffmpeg with -movflags +faststart so the moov atom is moved
+    # to the start of the file. Without this, browsers cannot play the video
+    # even when the codec is already H.264 (e.g. YouTube downloads with the
+    # moov atom at the end of the file).
     dst = convert_to_mp4(src, real_ext, bool(info.get("has_audio", True)))
     if not dst:
         log.warning("could not convert %s; keeping original", video.filename)
